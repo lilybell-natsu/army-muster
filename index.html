@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="en">
+<html lang="ja">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="app-version" content="0.1.0">
+<meta name="app-version" content="0.2.0">
 <meta name="theme-color" content="#1f2a37">
 <title>Army Muster</title>
 <link rel="manifest" href="manifest.json">
@@ -86,7 +86,12 @@ th { white-space: nowrap; }
 .statgrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px 12px; font-size: 13px; }
 .statgrid div { display: flex; justify-content: space-between; border-bottom: 1px dotted var(--line); }
 .radar { display: block; margin: 4px auto; max-width: 100%; height: auto; }
-.radar text { font-size: 10px; fill: var(--sub); }
+.radar text { font-size: 11px; fill: var(--sub); }
+.radars { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin: 8px 0 2px; }
+@media (max-width: 520px) { .radars { grid-template-columns: 1fr 1fr; } .radarbox:last-child { grid-column: 1 / -1; max-width: 50%; margin: 0 auto; } }
+.radarbox { text-align: center; min-width: 0; }
+.radarbox .radar { width: 100%; }
+.rtitle { font-size: 12px; font-weight: 700; }
 .toast { position: fixed; left: 50%; bottom: 80px; transform: translateX(-50%); background: #1f2a37; color: #fff; padding: 8px 14px; border-radius: 8px; font-size: 14px; z-index: 30; }
 [title] { cursor: help; }
 </style>
@@ -171,7 +176,7 @@ th { white-space: nowrap; }
       squadAvg: '小隊の平均', pickHint: '名前をタップで詳細',
     },
   };
-  let lang = store.get(LANG_KEY) === 'ja' ? 'ja' : 'en';
+  let lang = store.get(LANG_KEY) === 'en' ? 'en' : 'ja';   // Japanese by default; EN via the toggle
   const T = () => L[lang];
   const statLabel = (s) => (lang === 'ja' ? STAT_JA[s][0] : s);
   const statTitle = (s) => s + ' ' + STAT_JA[s][0] + ' — ' + STAT_JA[s][1];
@@ -218,6 +223,7 @@ th { white-space: nowrap; }
     return s + '</svg>';
   }
   const CAT_VARS = ['var(--phy)', 'var(--men)', 'var(--soc)'];
+  const CAT_FILLS = ['rgba(192,73,47,.16)', 'rgba(47,111,192,.16)', 'rgba(47,154,92,.16)'];
 
   // ---------- header / nav ----------
   function renderChrome() {
@@ -372,11 +378,16 @@ th { white-space: nowrap; }
   function openPerson(id) {
     const p = personById(id); if (!p) return;
     const t = T();
-    const axes = E.STATS.map(statLabel);
-    const colors = E.STATS.map((_, j) => CAT_VARS[E.catOf(j)]);
     let h = '<div class="sheet"><h2>' + esc(p.name) + ' ' + rankChip(p.rank) + ' ' + catChip(p.spec) + '</h2><div class="small">' +
       (p.job ? t.paths[p.job] : p.role ? t.roles[p.role] + ' · ' + t.squad + ' ' + p.squad : (p.fate ? t.paths[p.fate] || p.fate : '')) + ' · ' + t.origin2 + ': ' + t.origin[p.origin] + ' · ' + t.tenure + ' ' + p.tenure + ' ' + t.months2 + ' · ' + t.avg + ' ' + f0(E.mean(p.stats)) + '</div>';
-    h += radar(axes, [{ v: p.init, color: 'var(--sub)', dash: true }, { v: p.stats, color: 'var(--accent)', fill: 'rgba(160,110,40,.15)' }], 200, 320, colors);
+    // one 6-axis radar per category (PHYSICAL / MENTAL / SOCIAL), axis max fixed at 200
+    h += '<div class="radars">';
+    for (let c = 0; c < 3; c++) {
+      const js = [0, 1, 2, 3, 4, 5].map((k) => c * 6 + k);
+      h += '<div class="radarbox"><div class="rtitle c' + c + '">' + t.cats[c] + ' <span class="small">' + t.avg + ' ' + f0(E.mean(js.map((j) => p.stats[j]))) + '</span></div>' +
+        radar(js.map((j) => statLabel(E.STATS[j])), [{ v: js.map((j) => p.init[j]), color: 'var(--sub)', dash: true }, { v: js.map((j) => p.stats[j]), color: CAT_VARS[c], fill: CAT_FILLS[c] }], 200, 200) + '</div>';
+    }
+    h += '</div>';
     h += '<div class="small" style="text-align:center;margin-bottom:8px">- - ' + t.initial + ' / — ' + t.now + '</div>';
     h += '<div class="statgrid">';
     for (let k = 0; k < 6; k++) for (let c = 0; c < 3; c++) {

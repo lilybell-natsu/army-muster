@@ -4,7 +4,7 @@
 (function (root) {
   'use strict';
 
-  const VERSION = '0.1.0';
+  const VERSION = '0.2.0';
 
   // ---------- definitions ----------
   const STATS = ['VIT','STR','SPD','DEX','AGI','SEN', 'FOC','MEM','VIS','TAC','PRO','INS', 'CHA','CMD','POL','MAN','ELO','EMP'];

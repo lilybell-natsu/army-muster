@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.2.0 — 2026-10-02
+- Japanese is now the default display language (English via the EN/JA toggle)
+- Person sheet: the stat radar is split into three 6-axis charts, one per category (PHYSICAL / MENTAL / SOCIAL), each with its average
+
 ## v0.1.0 — 2026-10-02
 - First playable version (PWA)
 - Monthly plan: 0–3 battles (Skirmish / Clash / Ambush, opponent Weak / Even / Strong, great powers), governing policy, retreat policy
