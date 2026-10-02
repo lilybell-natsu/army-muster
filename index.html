@@ -1,0 +1,467 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="app-version" content="0.1.0">
+<meta name="theme-color" content="#1f2a37">
+<title>Army Muster</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<style>
+:root {
+  --bg: #f4f1ea; --panel: #ffffff; --ink: #1d232b; --sub: #5d6773; --line: #dcd6ca; --accent: #8a5a1c; --accent-ink: #ffffff;
+  --phy: #c0492f; --men: #2f6fc0; --soc: #2f9a5c;
+  --good: #2f8a4c; --mid: #a07a12; --bad: #b8392b; --muted: #eceae4;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #14181d; --panel: #1d232b; --ink: #e8e4dc; --sub: #9aa3ad; --line: #333b45; --accent: #d39a4a; --accent-ink: #14181d;
+    --phy: #e2735a; --men: #6a9fe6; --soc: #5cc489; --good: #5cc47e; --mid: #d6b34a; --bad: #e46a5c; --muted: #262d36;
+  }
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.45 system-ui, -apple-system, "Segoe UI", "Hiragino Sans", "Yu Gothic UI", sans-serif; }
+body { padding-bottom: calc(64px + env(safe-area-inset-bottom)); }
+header { position: sticky; top: 0; z-index: 5; background: #1f2a37; color: #f3efe6; padding: 10px 16px; display: flex; align-items: center; gap: 10px; }
+header h1 { font-size: 16px; letter-spacing: .12em; margin: 0; font-weight: 700; }
+header .meta { font-size: 13px; opacity: .9; margin-left: auto; text-align: right; }
+header button { background: transparent; border: 1px solid #5b6878; color: #f3efe6; border-radius: 6px; padding: 4px 8px; font-size: 13px; cursor: pointer; }
+main { max-width: 860px; margin: 0 auto; padding: 12px 16px; }
+nav { position: fixed; bottom: 0; left: 0; right: 0; background: var(--panel); border-top: 1px solid var(--line); display: flex; padding-bottom: env(safe-area-inset-bottom); z-index: 5; }
+nav button { flex: 1; background: none; border: 0; color: var(--sub); padding: 8px 4px 10px; font-size: 12px; cursor: pointer; }
+nav button .ic { display: block; font-size: 19px; line-height: 1.2; }
+nav button.on { color: var(--accent); font-weight: 700; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; margin-bottom: 12px; }
+.card h2 { font-size: 14px; margin: 0 0 8px; letter-spacing: .04em; display: flex; align-items: center; gap: 8px; }
+.card h2 .hint { font-weight: 400; color: var(--sub); font-size: 12px; margin-left: auto; }
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.seg button { background: var(--panel); color: var(--ink); border: 0; border-right: 1px solid var(--line); padding: 6px 10px; font-size: 13px; cursor: pointer; }
+.seg button:last-child { border-right: 0; }
+.seg button.on { background: var(--accent); color: var(--accent-ink); font-weight: 700; }
+.seg button.big { color: var(--bad); font-weight: 700; }
+.seg button.big.on { background: var(--bad); color: #fff; }
+select { background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: 6px; padding: 4px 6px; font-size: 13px; max-width: 100%; }
+.btn { background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 7px 12px; font-size: 14px; cursor: pointer; }
+.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 700; }
+.btn.wide { width: 100%; padding: 12px; font-size: 16px; }
+.btn:disabled { opacity: .45; cursor: default; }
+.small { font-size: 12px; color: var(--sub); }
+.battle { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; margin-bottom: 8px; }
+.battle .head { display: flex; gap: 8px; align-items: center; margin-bottom: 6px; flex-wrap: wrap; }
+.odds { font-size: 12px; padding: 2px 8px; border-radius: 10px; background: var(--muted); }
+.t0, .t1, .t2 { color: var(--good); } .t3 { color: var(--mid); } .t4, .t5 { color: var(--bad); } .t6 { color: var(--sub); }
+.bar { height: 6px; background: var(--muted); border-radius: 3px; overflow: hidden; }
+.bar > i { display: block; height: 100%; background: var(--accent); }
+.ind { display: grid; grid-template-columns: 96px 1fr 34px; gap: 6px; align-items: center; font-size: 13px; margin: 3px 0; }
+.chip { display: inline-block; font-size: 11px; padding: 1px 6px; border-radius: 9px; border: 1px solid currentColor; white-space: nowrap; }
+.c0 { color: var(--phy); } .c1 { color: var(--men); } .c2 { color: var(--soc); }
+.r0 { color: var(--sub); } .r1 { color: var(--men); } .r2 { color: var(--accent); } .r3 { color: var(--bad); font-weight: 700; }
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+th, td { padding: 5px 6px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: middle; }
+th { color: var(--sub); font-weight: 600; font-size: 12px; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+.tablewrap { overflow-x: auto; }
+.tablewrap table { min-width: 460px; }
+th { white-space: nowrap; }
+.person { cursor: pointer; text-decoration: underline dotted; }
+.leap { color: var(--accent); font-weight: 700; }
+.cands { display: grid; gap: 6px; }
+.cand { display: flex; align-items: center; gap: 8px; border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; }
+.cand .who { flex: 1; min-width: 0; }
+.cand.joined { border-color: var(--good); }
+.cand.declined { opacity: .55; }
+.cand .res { font-size: 12px; font-weight: 700; }
+.district { border: 1px solid var(--line); border-radius: 10px; padding: 10px; margin-bottom: 10px; }
+.district h3 { margin: 0 0 6px; font-size: 13px; display: flex; gap: 8px; align-items: center; }
+.rep { border-left: 3px solid var(--line); padding: 4px 0 4px 10px; margin: 0 0 12px; }
+.rep h3 { font-size: 13px; margin: 0 0 4px; }
+.rep ul { margin: 0; padding-left: 18px; font-size: 13px; }
+.modal { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: flex; align-items: flex-end; justify-content: center; z-index: 20; }
+.modal .sheet { background: var(--panel); width: 100%; max-width: 640px; max-height: 92vh; overflow: auto; border-radius: 14px 14px 0 0; padding: 14px 16px 20px; }
+@media (min-width: 700px) { .modal { align-items: center; } .modal .sheet { border-radius: 14px; } }
+.sheet h2 { margin: 0 0 6px; font-size: 17px; }
+.statgrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px 12px; font-size: 13px; }
+.statgrid div { display: flex; justify-content: space-between; border-bottom: 1px dotted var(--line); }
+.radar { display: block; margin: 4px auto; max-width: 100%; height: auto; }
+.radar text { font-size: 10px; fill: var(--sub); }
+.toast { position: fixed; left: 50%; bottom: 80px; transform: translateX(-50%); background: #1f2a37; color: #fff; padding: 8px 14px; border-radius: 8px; font-size: 14px; z-index: 30; }
+[title] { cursor: help; }
+</style>
+</head>
+<body>
+<header>
+  <h1 id="ttl">ARMY MUSTER</h1>
+  <div class="meta" id="meta"></div>
+  <button id="langBtn" title="Language / 言語">EN</button>
+  <button id="menuBtn" title="Settings">⚙</button>
+</header>
+<main id="main"></main>
+<nav id="nav"></nav>
+<div id="modal"></div>
+<script src="engine.js"></script>
+<script>
+(function () {
+  'use strict';
+  const E = window.GameEngine;
+  const SAVE_KEY = 'armyMuster.save', LANG_KEY = 'armyMuster.lang';
+  const store = {
+    get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+    set(k, v) { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } },
+    del(k) { try { localStorage.removeItem(k); } catch (e) { /* storage unavailable */ } },
+  };
+
+  // ---------- labels (English is the default; Japanese via the toggle) ----------
+  const STAT_JA = { VIT: ['体力', '疲れずに動き続ける'], STR: ['腕力', '持てる量・力の強さ'], SPD: ['脚力', '動ける範囲'], DEX: ['技術力', '技術の正確さ'], AGI: ['瞬発力', '体の反応速度'], SEN: ['感覚', '気配を感じ取る'],
+    FOC: ['集中', '頭が持つ・集中が続く'], MEM: ['記憶', '覚えられる量'], VIS: ['俯瞰', '見渡せる範囲'], TAC: ['策略', '作戦の緻密さ'], PRO: ['処理', '頭の回転'], INS: ['発想', '閃きを捉える'],
+    CHA: ['人望', '支持が続く'], CMD: ['掌握', '動かせる人の量'], POL: ['政治', '影響の及ぶ範囲'], MAN: ['籠絡', '操り方の巧さ'], ELO: ['弁舌', '口の回転'], EMP: ['読心', '人の本心を見抜く'] };
+  const L = {
+    en: {
+      tabs: ['Plan', 'Army', 'Domain', 'Reports'], year: 'Year', cls: 'Class', troops: 'Troops',
+      months: ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],
+      cats: ['PHYSICAL', 'MENTAL', 'SOCIAL'], ranks: ['Common', 'Promising', 'Gifted', 'Prodigy'],
+      roles: { commander: 'Commander', infantry: 'Infantry', archer: 'Archer' },
+      tiers: ['Total victory', 'Major victory', 'Victory', 'Stalemate', 'Defeat', 'Rout', 'Retreat'],
+      opp: { weak: 'Weak', equal: 'Even', strong: 'Strong', big: 'Great power', random: 'Raid', sudden: 'Sudden foe' },
+      gov: { dev: 'Develop', dis: 'Discipline', pac: 'Pacify', dip: 'Negotiate', auto: 'Auto' },
+      ind: { dev: 'Prosperity', dis: 'Order', pac: 'Morale', dip: 'Diplomacy' },
+      paths: { empire: 'Empire', instructor: 'Instructor', bureau: 'Bureaucrat', general: 'General', retire: 'Retired' },
+      origin: { init: 'Founding', new: 'Recruit', scout: 'Scouted', levy: 'Levied', refill: 'Emergency' },
+      battles: 'Battles this month', turn: 'Turn', type: 'Battle', opponent: 'Opponent', odds: 'Odds', none: 'No planned battle — every turn goes to governing.',
+      govern: 'Governing policy', govHint: 'used on turns without a battle', retreat: 'Retreat policy', retreatOpts: { defeat: 'If defeat looms', stalemate: 'If not winning', never: 'Never' },
+      training: 'Training', trainHint: 'each soldier trains one stat per month', autoFocus: 'Set all to role needs', autoRoles: 'Auto-assign roles', run: 'Run month ▶',
+      leapNow: 'LEAP this month (growth ×2):', bigWarn: 'A great power is in the field — "Strong" means facing it.',
+      scoutTitle: 'Scouting', scoutLeft: 'Attempts left', recruiter: 'Recruiter', district: 'district', unknown: 'Unknown', tryBtn: 'Recruit', joined: 'Joined', declined: 'Declined',
+      scoutDone: 'Finish scouting', scoutInfo: 'Only rank and specialty are visible. Higher ranks are harder to win over; failed attempts go to open recruitment.',
+      chance: 'chance', intakeTotal: 'New soldiers this year', squad: 'Squad', name: 'Name', role: 'Role', rank: 'Rank', avg: 'Avg', focus: 'Focus', left: 'To grad.', retainers: 'Retainers',
+      jobs: 'Retained graduates', cap: 'Capacity', recruitsYr: 'Recruits / yr', history: 'Yearly record', grads: 'Graduates', empire: 'To Empire', score: 'Empire score',
+      noReports: 'Nothing yet. Plan the month and run it.', intake: 'New soldiers', scoutedL: 'Scouted', generalL: 'Open recruitment', failedL: 'failed attempts',
+      lost: 'Lost', levy: 'Levied', mvp: 'MVP', refill: 'Emergency recruits', gradL: 'Graduated', clsChange: 'Class', governed: 'Governing',
+      newGame: 'New game', newGameQ: 'Start a new game? The current save will be erased.', close: 'Close', settings: 'Settings', version: 'Version',
+      initial: 'At enlistment', now: 'Now', months2: 'months', talent: 'Talent', tenure: 'Service', origin2: 'Origin', spec: 'Specialty', theme: 'Theme', themes: { auto: 'Auto', light: 'Light', dark: 'Dark' },
+      saved: 'Saved', storageOff: 'Storage is unavailable — progress will not be saved.', yearEnd: 'Year end', recordCols: ['Yr', 'Class', 'Troops', 'Avg', 'Battles', 'W', 'L', 'Lost', 'Levied', 'Grads', 'Empire', 'Score'],
+      squadAvg: 'Squad average', pickHint: 'Tap a name for details',
+    },
+    ja: {
+      tabs: ['計画', '軍', '領地', '報告'], year: '年', cls: 'クラス', troops: '兵力',
+      months: ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'],
+      cats: ['身体', '思考', '人心'], ranks: ['一般', '有望', '逸材', '傑物'],
+      roles: { commander: '指揮官', infantry: '歩兵', archer: '弓兵' },
+      tiers: ['完全勝利', '大勝利', '勝利', '痛み分け', '敗北', '完全敗北', '撤退'],
+      opp: { weak: '弱い', equal: '同程度', strong: '強い', big: '大国', random: '襲撃', sudden: '急な強敵' },
+      gov: { dev: '開発', dis: '軍規', pac: '民政', dip: '外交', auto: '自動' },
+      ind: { dev: '発展度', dis: '軍規', pac: '民心', dip: '外交' },
+      paths: { empire: '帝国', instructor: '指導者', bureau: '官僚', general: '将官', retire: '退役' },
+      origin: { init: '初期', new: '一般募集', scout: 'スカウト', levy: '挙兵', refill: '緊急登用' },
+      battles: '今月の戦', turn: 'ターン', type: '戦闘', opponent: '相手', odds: '勝算', none: '戦の予定なし — すべてのターンを統治にあてる',
+      govern: '統治方針', govHint: '戦のないターンに行う', retreat: '撤退方針', retreatOpts: { defeat: '敗北見込みで撤退', stalemate: '勝てない見込みで撤退', never: '撤退しない' },
+      training: '月内鍛錬', trainHint: '1人につき月に1項目を強化', autoFocus: '全員を兵科の求めに合わせる', autoRoles: '兵科を自動配置', run: '今月を実行 ▶',
+      leapNow: '今月の飛躍期(成長2倍):', bigWarn: '大国が現れている — 「強い」を選ぶと大国と戦う',
+      scoutTitle: 'スカウト', scoutLeft: '残り回数', recruiter: '勧誘役', district: 'の地区', unknown: '未確認', tryBtn: '勧誘', joined: '入隊', declined: '辞退',
+      scoutDone: 'スカウトを終える', scoutInfo: '見えるのはランクと得意カテゴリだけ。上位ほど応じにくい。失敗した分は一般募集に回る。',
+      chance: '成功率', intakeTotal: '今年の新兵', squad: '小隊', name: '名前', role: '兵科', rank: 'ランク', avg: '平均', focus: '鍛錬', left: '卒兵まで', retainers: '残留者',
+      jobs: '残留した卒兵', cap: '兵力上限', recruitsYr: '年間の新兵', history: '年ごとの記録', grads: '卒兵', empire: '帝国へ', score: '帝国評価点',
+      noReports: 'まだ記録がない。今月の計画を立てて実行しよう。', intake: '新兵', scoutedL: 'スカウト', generalL: '一般募集', failedL: '失敗',
+      lost: '損失', levy: '挙兵', mvp: 'MVP', refill: '緊急登用', gradL: '卒兵', clsChange: 'クラス', governed: '統治',
+      newGame: '新しく始める', newGameQ: '新しく始めますか?今のセーブは消えます。', close: '閉じる', settings: '設定', version: 'バージョン',
+      initial: '入隊時', now: '現在', months2: 'か月', talent: '素質', tenure: '在籍', origin2: '入り方', spec: '得意', theme: '表示', themes: { auto: '自動', light: 'ライト', dark: 'ダーク' },
+      saved: '保存しました', storageOff: '保存できない環境です(進行は保存されません)', yearEnd: '年末', recordCols: ['年', 'クラス', '在籍', '平均', '戦', '勝', '敗', '損失', '挙兵', '卒兵', '帝国', '評価点'],
+      squadAvg: '小隊の平均', pickHint: '名前をタップで詳細',
+    },
+  };
+  let lang = store.get(LANG_KEY) === 'ja' ? 'ja' : 'en';
+  const T = () => L[lang];
+  const statLabel = (s) => (lang === 'ja' ? STAT_JA[s][0] : s);
+  const statTitle = (s) => s + ' ' + STAT_JA[s][0] + ' — ' + STAT_JA[s][1];
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const f0 = (x) => Math.round(x);
+
+  // ---------- state ----------
+  let g = null, tab = 0;
+  function load() {
+    const raw = store.get(SAVE_KEY);
+    if (raw) { try { const s = JSON.parse(raw); if (s && s.people) return s; } catch (e) { /* broken save — start over */ } }
+    return null;
+  }
+  function save() { if (!store.set(SAVE_KEY, JSON.stringify(g))) toast(T().storageOff); }
+  g = load() || E.newGame((Date.now() ^ (Math.random() * 1e9)) >>> 0);
+
+  // ---------- small UI helpers ----------
+  function toast(msg) {
+    const d = document.createElement('div'); d.className = 'toast'; d.textContent = msg; document.body.appendChild(d);
+    setTimeout(() => d.remove(), 1800);
+  }
+  const catChip = (c) => '<span class="chip c' + c + '">' + T().cats[c] + '</span>';
+  const rankChip = (r) => (r === null || r === undefined ? '' : '<span class="chip r' + r + '">' + T().ranks[r] + '</span>');
+  const tierSpan = (t) => '<b class="t' + t + '">' + T().tiers[t] + '</b>';
+  const dateLabel = (m) => (lang === 'ja' ? (Math.floor(m / 12) + 1) + '年目 ' + T().months[m % 12] : T().months[m % 12] + ', ' + T().year + ' ' + (Math.floor(m / 12) + 1));
+  const personById = (id) => g.people.find((p) => p.id === id);
+
+  // radar chart: axes = labels, series = [{v:[...], color, fill}], max
+  function radar(axes, series, max, size, axisColors) {
+    const n = axes.length, c = size / 2, R = size / 2 - 34;
+    const pt = (i, v) => { const a = -Math.PI / 2 + 2 * Math.PI * i / n; const r = R * Math.max(0, Math.min(1, v / max)); return [c + r * Math.cos(a), c + r * Math.sin(a)]; };
+    let s = '<svg class="radar" viewBox="0 0 ' + size + ' ' + size + '" width="' + size + '" role="img">';
+    [0.25, 0.5, 0.75, 1].forEach((k) => {
+      s += '<polygon points="' + axes.map((_, i) => pt(i, max * k).join(',')).join(' ') + '" fill="none" stroke="var(--line)" stroke-width="1"/>';
+    });
+    axes.forEach((a, i) => {
+      const [x, y] = pt(i, max); const [lx, ly] = pt(i, max * 1.16);
+      s += '<line x1="' + c + '" y1="' + c + '" x2="' + x + '" y2="' + y + '" stroke="var(--line)"/>';
+      s += '<text x="' + lx + '" y="' + (ly + 3) + '" text-anchor="middle"' + (axisColors ? ' style="fill:' + axisColors[i] + '"' : '') + '>' + esc(a) + '</text>';
+    });
+    series.forEach((sr) => {
+      s += '<polygon points="' + sr.v.map((v, i) => pt(i, v).join(',')).join(' ') + '" fill="' + (sr.fill || 'none') + '" stroke="' + sr.color + '" stroke-width="2"' + (sr.dash ? ' stroke-dasharray="4 3"' : '') + '/>';
+    });
+    return s + '</svg>';
+  }
+  const CAT_VARS = ['var(--phy)', 'var(--men)', 'var(--soc)'];
+
+  // ---------- header / nav ----------
+  function renderChrome() {
+    document.documentElement.lang = lang;
+    document.getElementById('langBtn').textContent = lang === 'ja' ? 'JA' : 'EN';
+    const s = E.soldiers(g).length;
+    document.getElementById('meta').innerHTML = esc(dateLabel(g.month)) + '<br>' + T().cls + ' ' + g.cls + ' · ' + T().troops + ' ' + s + '/' + E.capacity(g);
+    const icons = ['⚔', '🛡', '⚖', '📜'];
+    document.getElementById('nav').innerHTML = T().tabs.map((t, i) => '<button data-tab="' + i + '" class="' + (i === tab ? 'on' : '') + '"><span class="ic">' + icons[i] + '</span>' + t + '</button>').join('');
+  }
+
+  // ---------- Plan tab (or Scouting in January) ----------
+  function renderPlan() {
+    if (g.phase === 'scout') return renderScout();
+    const t = T(); const plan = g.plan;
+    let h = '';
+    const leaps = E.soldiers(g).filter((p) => p.leap);
+    if (leaps.length) h += '<div class="card"><span class="leap">' + t.leapNow + '</span> ' + leaps.map((p) => '<span class="person" data-person="' + p.id + '">' + esc(p.name) + '</span>').join(', ') + '</div>';
+
+    h += '<div class="card"><h2>' + t.battles + '<span class="hint">' + t.turn + ' ' + ({ 0: '-', 1: '3', 2: '2, 4', 3: '1, 3, 5' }[plan.battles.length]) + '</span></h2>';
+    h += '<div class="seg" style="margin-bottom:10px">' + [0, 1, 2, 3].map((n) => '<button data-nb="' + n + '" class="' + (plan.battles.length === n ? 'on' : '') + '">' + n + '</button>').join('') + '</div>';
+    if (!plan.battles.length) h += '<div class="small">' + t.none + '</div>';
+    plan.battles.forEach((b, i) => {
+      const big = g.offers[i];
+      const est = E.estimate(g, b.type, b.opp, big);
+      const tier = E.tierOf(est);
+      h += '<div class="battle"><div class="head"><b>#' + (i + 1) + '</b>';
+      h += '<select data-btype="' + i + '">' + E.BATTLE_TYPES.map((x) => '<option value="' + x + '"' + (x === b.type ? ' selected' : '') + '>' + x + '</option>').join('') + '</select>';
+      h += '<span class="odds">' + t.odds + ' ' + est.toFixed(2) + ' → ' + tierSpan(tier) + '</span></div>';
+      h += '<div class="seg">' + ['weak', 'equal', 'strong'].map((o) => '<button data-bopp="' + i + ':' + o + '" class="' + (b.opp === o ? 'on ' : '') + (o === 'strong' && big ? 'big' : '') + '">' + (o === 'strong' && big ? t.opp.big : t.opp[o]) + '</button>').join('') + '</div>';
+      if (big) h += '<div class="small" style="margin-top:4px;color:var(--bad)">' + t.bigWarn + '</div>';
+      h += '</div>';
+    });
+    h += '<div class="row" style="margin-top:6px"><span class="small">' + t.retreat + '</span><select data-retreat>' + ['defeat', 'stalemate', 'never'].map((k) => '<option value="' + k + '"' + (plan.retreat === k ? ' selected' : '') + '>' + t.retreatOpts[k] + '</option>').join('') + '</select></div></div>';
+
+    h += '<div class="card"><h2>' + t.govern + '<span class="hint">' + t.govHint + '</span></h2>';
+    h += '<div class="seg" style="margin-bottom:8px">' + ['auto', 'dev', 'dis', 'pac', 'dip'].map((k) => '<button data-gov="' + k + '" class="' + (plan.policy === k ? 'on' : '') + '">' + t.gov[k] + '</button>').join('') + '</div>';
+    ['dev', 'dis', 'pac', 'dip'].forEach((k) => { h += '<div class="ind"><span>' + t.ind[k] + '</span><div class="bar"><i style="width:' + g.ind[k] + '%"></i></div><span class="small">' + f0(g.ind[k]) + '</span></div>'; });
+    h += '</div>';
+
+    const sol = E.soldiers(g);
+    const byFocus = {}; sol.forEach((p) => { const s = E.STATS[p.focus]; byFocus[s] = (byFocus[s] || 0) + 1; });
+    h += '<div class="card"><h2>' + t.training + '<span class="hint">' + t.trainHint + '</span></h2><div class="small" style="margin-bottom:8px">' +
+      Object.keys(byFocus).sort((a, b) => byFocus[b] - byFocus[a]).map((s) => '<span title="' + esc(statTitle(s)) + '">' + statLabel(s) + '</span> ×' + byFocus[s]).join(' · ') + '</div>' +
+      '<div class="row"><button class="btn" data-act="autoFocus">' + t.autoFocus + '</button><button class="btn" data-tab="1">' + t.tabs[1] + ' →</button></div></div>';
+
+    h += '<button class="btn primary wide" data-act="run">' + t.run + '</button>';
+    return h;
+  }
+
+  function renderScout() {
+    const t = T(); const s = g.scout;
+    const rec = E.recruiter(g);
+    let h = '<div class="card"><h2>' + t.scoutTitle + ' — ' + esc(dateLabel(g.month)) + '</h2>';
+    h += '<div class="small">' + t.scoutInfo + '</div>';
+    h += '<div class="row" style="margin-top:8px"><b>' + t.scoutLeft + ': ' + (s.picks - s.used) + ' / ' + s.picks + '</b><span class="small">' + t.intakeTotal + ': ' + s.total + '</span></div>';
+    if (rec) h += '<div class="small" style="margin-top:4px">' + t.recruiter + ': <span class="person" data-person="' + rec.id + '">' + esc(rec.name) + '</span> (CHA/MAN/EMP ' + f0(E.recruitScore(rec)) + ') · ' + t.chance + ': ' +
+      [0, 1, 2, 3].map((r) => T().ranks[r] + ' ' + f0(E.scoutP(g, r) * 100) + '%').join(' / ') + '</div>';
+    h += '</div>';
+    s.districts.forEach((d, di) => {
+      h += '<div class="district"><h3>' + catChip(d.trait) + ' ' + (lang === 'ja' ? ['武', '知', '人'][d.trait] + t.district : t.district) + ' #' + (di + 1) + '</h3><div class="cands">';
+      d.cands.forEach((c, ci) => {
+        const show = c.vis || c.revealed;
+        h += '<div class="cand ' + c.state + '"><div class="who">' + (show ? rankChip(c.gen.rank) + ' ' + catChip(c.gen.spec) : '<span class="chip">' + t.unknown + '</span>') +
+          (c.state !== 'open' ? ' <span class="small">' + esc(c.name) + '</span>' : '') + '</div>';
+        if (c.state === 'open') {
+          const p = show ? E.scoutP(g, c.gen.rank) : null;
+          h += (p !== null ? '<span class="small">' + f0(p * 100) + '%</span>' : '<span class="small">?</span>') +
+            '<button class="btn" data-scout="' + di + ':' + ci + '"' + (s.used >= s.picks ? ' disabled' : '') + '>' + t.tryBtn + '</button>';
+        } else h += '<span class="res ' + (c.state === 'joined' ? 't0' : 't4') + '">' + (c.state === 'joined' ? t.joined : t.declined) + '</span>';
+        h += '</div>';
+      });
+      h += '</div></div>';
+    });
+    h += '<button class="btn primary wide" data-act="scoutDone">' + t.scoutDone + '</button>';
+    return h;
+  }
+
+  // ---------- Army tab ----------
+  function renderArmy() {
+    const t = T(); const by = E.squadsOf(g);
+    let h = '<div class="row" style="margin-bottom:10px"><button class="btn" data-act="autoRoles">' + t.autoRoles + '</button><button class="btn" data-act="autoFocus">' + t.autoFocus + '</button><span class="small">' + t.pickHint + '</span></div>';
+    Object.keys(by).map(Number).sort((a, b) => a - b).forEach((sq) => {
+      const list = by[sq];
+      const avg = E.STATS.map((_, j) => E.mean(list.map((p) => p.stats[j])));
+      h += '<div class="card"><h2>' + t.squad + ' ' + sq + '<span class="hint">' + t.avg + ' ' + f0(E.mean(avg)) + '</span></h2><div class="tablewrap"><table><tr><th>' + t.name + '</th><th>' + t.role + '</th><th>' + t.rank + '</th><th class="num">' + t.avg + '</th><th>' + t.focus + '</th><th class="num">' + t.left + '</th></tr>';
+      list.slice().sort((a, b) => E.ROLES.indexOf(a.role) - E.ROLES.indexOf(b.role)).forEach((p) => {
+        h += '<tr><td><span class="person" data-person="' + p.id + '">' + esc(p.name) + '</span> ' + '<span class="chip c' + p.spec + '" title="' + t.spec + '">' + t.cats[p.spec].slice(0, lang === 'ja' ? 2 : 3) + '</span>' + (p.leap ? ' <span class="leap" title="LEAP">↑</span>' : '') + '</td>';
+        h += '<td><select data-role="' + p.id + '">' + E.ROLES.map((r) => '<option value="' + r + '"' + (p.role === r ? ' selected' : '') + '>' + t.roles[r] + '</option>').join('') + '</select></td>';
+        h += '<td>' + rankChip(p.rank) + '</td><td class="num">' + f0(E.mean(p.stats)) + '</td>';
+        h += '<td><select data-focus="' + p.id + '">' + E.STATS.map((s, j) => '<option value="' + j + '"' + (p.focus === j ? ' selected' : '') + '>' + statLabel(s) + (E.ROLE_REQ[p.role].includes(j) ? ' *' : '') + '</option>').join('') + '</select></td>';
+        h += '<td class="num">' + (60 - p.tenure) + '</td></tr>';
+      });
+      h += '</table></div></div>';
+    });
+    const jobs = g.people.filter((p) => p.alive && p.job);
+    if (jobs.length) {
+      h += '<div class="card"><h2>' + t.jobs + '</h2><table>' + jobs.map((p) => '<tr><td><span class="person" data-person="' + p.id + '">' + esc(p.name) + '</span></td><td>' + t.paths[p.job] + '</td><td class="num">' + f0(E.mean(p.stats)) + '</td></tr>').join('') + '</table></div>';
+    }
+    return h;
+  }
+
+  // ---------- Domain tab ----------
+  function renderDomain() {
+    const t = T(); const C = E.CFG;
+    let h = '<div class="card"><h2>' + t.cls + ' ' + g.cls + ' / 5</h2><div class="row small">' +
+      '<span>' + t.cap + ': ' + E.capacity(g) + '</span><span>' + t.recruitsYr + ': ' + C.recruitByClass[g.cls - 1] + '</span><span>' + t.scoutTitle + ': ' + C.scoutDistricts[g.cls - 1] + '</span></div></div>';
+    const keys = ['dev', 'dis', 'pac', 'dip'];
+    h += '<div class="card"><h2>' + t.govern + '</h2>' + radar(keys.map((k) => t.ind[k]), [{ v: keys.map((k) => g.ind[k]), color: 'var(--accent)', fill: 'rgba(160,110,40,.18)' }], 100, 260) + '</div>';
+    const ys = g.ys;
+    h += '<div class="card"><h2>' + (lang === 'ja' ? E.year(g) + '年目' : t.year + ' ' + E.year(g)) + '</h2><div class="small">' + t.battles + ': ' + ys.battles + ' · W ' + ys.wins + ' / L ' + ys.losses + ' · ' + t.lost + ' ' + ys.deaths + ' · ' + t.levy + ' ' + ys.levied + ' · ' + t.grads + ' ' + ys.grads.length + '</div></div>';
+    if (g.history.length) {
+      h += '<div class="card"><h2>' + t.history + '</h2><div class="tablewrap"><table><tr>' + t.recordCols.map((c, i) => '<th' + (i ? ' class="num"' : '') + '>' + c + '</th>').join('') + '</tr>';
+      g.history.slice().reverse().forEach((r) => {
+        h += '<tr><td>' + r.year + '</td><td class="num">' + r.clsBefore + (r.clsAfter !== r.clsBefore ? '→' + r.clsAfter : '') + '</td><td class="num">' + r.soldiers + '</td><td class="num">' + f0(r.meanAll) + '</td><td class="num">' + r.battles + '</td><td class="num">' + r.wins + '</td><td class="num">' + r.losses + '</td><td class="num">' + r.deaths + '</td><td class="num">' + r.levied + '</td><td class="num">' + r.grads + '</td><td class="num">' + r.empire + '</td><td class="num">' + (r.score === null ? '-' : r.score.toFixed(1)) + '</td></tr>';
+      });
+      h += '</table></div></div>';
+    }
+    if (g.grads.length) {
+      const cnt = {}; g.grads.forEach((x) => { cnt[x.path] = (cnt[x.path] || 0) + 1; });
+      h += '<div class="card"><h2>' + t.grads + ' (' + g.grads.length + ')</h2><div class="small">' + E.PATHS.filter((k) => cnt[k]).map((k) => t.paths[k] + ' ' + cnt[k]).join(' · ') + '</div></div>';
+    }
+    return h;
+  }
+
+  // ---------- Reports tab ----------
+  function renderReports() {
+    const t = T();
+    if (!g.reports.length) return '<div class="card small">' + t.noReports + '</div>';
+    const nm = (id) => { const p = personById(id); return p ? '<span class="person" data-person="' + id + '">' + esc(p.name) + '</span>' + (p.rank !== null ? ' ' + rankChip(p.rank) : '') : '?'; };
+    return g.reports.map((r) => {
+      let h = '<div class="rep"><h3>' + esc(dateLabel(r.month)) + (r.kind === 'intake' ? ' — ' + t.intake : '') + '</h3><ul>';
+      if (r.kind === 'intake') {
+        h += '<li>' + t.scoutedL + ': ' + (r.scouted.length ? r.scouted.map(nm).join(', ') : '-') + (r.failed ? ' (' + t.failedL + ' ' + r.failed + ')' : '') + '</li>';
+        h += '<li>' + t.generalL + ': ' + r.general.length + '</li>';
+      } else {
+        r.battles.forEach((b) => {
+          h += '<li>' + t.turn + ' ' + b.turn + ': ' + b.type + ' vs ' + t.opp[b.kind] + ' — ' + tierSpan(b.tier) + ' (' + b.ratio.toFixed(2) + ', ' + b.parts + ' vs ' + b.enemy + ')' +
+            (b.dead.length ? ' · ' + t.lost + ': ' + b.dead.map(esc).join(', ') : '') + (b.levied ? ' · ' + t.levy + ' +' + b.levied + (b.levyWanted > b.levied ? '/' + b.levyWanted : '') : '') +
+            (b.refilled ? ' · ' + t.refill + ' +' + b.refilled : '') + (b.mvp ? ' · ' + t.mvp + ': ' + esc(b.mvp) : '') + '</li>';
+        });
+        if (r.govern > 0) h += '<li>' + t.governed + ': ' + t.gov[r.policy] + ' +' + r.govern.toFixed(1) + '</li>';
+        if (r.leaps.length) h += '<li class="leap">LEAP: ' + r.leaps.map(esc).join(', ') + '</li>';
+        r.grads.forEach((x) => { h += '<li>' + t.gradL + ': ' + esc(x.name) + ' → ' + t.paths[x.path] + ' (' + t.avg + ' ' + f0(x.mean) + ')</li>'; });
+        if (r.cls) h += '<li><b>' + t.yearEnd + '</b>: ' + t.score + ' ' + (r.cls.score === null ? '-' : r.cls.score.toFixed(1)) + ' · ' + t.clsChange + ' ' + r.cls.before + (r.cls.after !== r.cls.before ? ' → <b>' + r.cls.after + '</b>' : '') + '</li>';
+      }
+      return h + '</ul></div>';
+    }).join('');
+  }
+
+  // ---------- person sheet ----------
+  function openPerson(id) {
+    const p = personById(id); if (!p) return;
+    const t = T();
+    const axes = E.STATS.map(statLabel);
+    const colors = E.STATS.map((_, j) => CAT_VARS[E.catOf(j)]);
+    let h = '<div class="sheet"><h2>' + esc(p.name) + ' ' + rankChip(p.rank) + ' ' + catChip(p.spec) + '</h2><div class="small">' +
+      (p.job ? t.paths[p.job] : p.role ? t.roles[p.role] + ' · ' + t.squad + ' ' + p.squad : (p.fate ? t.paths[p.fate] || p.fate : '')) + ' · ' + t.origin2 + ': ' + t.origin[p.origin] + ' · ' + t.tenure + ' ' + p.tenure + ' ' + t.months2 + ' · ' + t.avg + ' ' + f0(E.mean(p.stats)) + '</div>';
+    h += radar(axes, [{ v: p.init, color: 'var(--sub)', dash: true }, { v: p.stats, color: 'var(--accent)', fill: 'rgba(160,110,40,.15)' }], 200, 320, colors);
+    h += '<div class="small" style="text-align:center;margin-bottom:8px">- - ' + t.initial + ' / — ' + t.now + '</div>';
+    h += '<div class="statgrid">';
+    for (let k = 0; k < 6; k++) for (let c = 0; c < 3; c++) {
+      const j = c * 6 + k; const s = E.STATS[j];
+      h += '<div class="c' + c + '"><span title="' + esc(statTitle(s)) + '">' + statLabel(s) + (p.focus === j ? ' ●' : '') + '</span><b>' + f0(p.stats[j]) + '</b></div>';
+    }
+    h += '</div><div style="margin-top:14px;text-align:right"><button class="btn" data-act="closeModal">' + t.close + '</button></div></div>';
+    showModal(h);
+  }
+
+  function openSettings() {
+    const t = T();
+    const theme = store.get('armyMuster.theme') || 'auto';
+    showModal('<div class="sheet"><h2>' + t.settings + '</h2>' +
+      '<div class="row" style="margin:10px 0"><span>' + t.theme + '</span><div class="seg">' + ['auto', 'light', 'dark'].map((k) => '<button data-theme="' + k + '" class="' + (theme === k ? 'on' : '') + '">' + t.themes[k] + '</button>').join('') + '</div></div>' +
+      '<div class="row" style="margin:10px 0"><button class="btn" data-act="newGame">' + t.newGame + '</button></div>' +
+      '<div class="small">' + t.version + ' ' + E.VERSION + '</div>' +
+      '<div style="margin-top:14px;text-align:right"><button class="btn" data-act="closeModal">' + t.close + '</button></div></div>');
+  }
+  function applyTheme() { const th = store.get('armyMuster.theme'); if (th === 'light' || th === 'dark') document.documentElement.setAttribute('data-theme', th); else document.documentElement.removeAttribute('data-theme'); }
+
+  function showModal(html) { const m = document.getElementById('modal'); m.innerHTML = '<div class="modal" data-act="closeBg">' + html + '</div>'; }
+  function closeModal() { document.getElementById('modal').innerHTML = ''; }
+
+  // ---------- render ----------
+  function render() {
+    renderChrome();
+    const main = document.getElementById('main');
+    main.innerHTML = [renderPlan, renderArmy, renderDomain, renderReports][tab]();
+  }
+
+  // ---------- events ----------
+  document.addEventListener('click', (ev) => {
+    const el = ev.target.closest('[data-tab],[data-nb],[data-bopp],[data-gov],[data-act],[data-person],[data-scout],[data-theme]');
+    if (!el) return;
+    const d = el.dataset;
+    if (d.tab !== undefined) { tab = +d.tab; window.scrollTo(0, 0); render(); return; }
+    if (d.person) { openPerson(+d.person); return; }
+    if (d.theme) { store.set('armyMuster.theme', d.theme); applyTheme(); openSettings(); return; }
+    if (d.nb !== undefined) {
+      const n = +d.nb; const b = g.plan.battles;
+      while (b.length < n) b.push({ opp: 'equal', type: E.BATTLE_TYPES[b.length % 3] });
+      b.length = n; save(); render(); return;
+    }
+    if (d.bopp) { const [i, o] = d.bopp.split(':'); g.plan.battles[+i].opp = o; save(); render(); return; }
+    if (d.gov) { g.plan.policy = d.gov; save(); render(); return; }
+    if (d.scout) {
+      const [di, ci] = d.scout.split(':').map(Number);
+      const r = E.scoutPick(g, di, ci);
+      if (r) toast((r.ok ? T().joined : T().declined) + ' — ' + T().ranks[r.rank]);
+      save(); render(); return;
+    }
+    switch (d.act) {
+      case 'run': {
+        const rep = E.runMonth(g, g.plan); save();
+        const bs = rep.battles.map((b) => T().tiers[b.tier]).join(', ');
+        toast(dateLabel(rep.month) + (bs ? ' — ' + bs : ''));
+        window.scrollTo(0, 0); render(); break;
+      }
+      case 'scoutDone': E.scoutFinish(g); save(); render(); break;
+      case 'autoFocus': E.autoFocus(g); save(); render(); toast(T().saved); break;
+      case 'autoRoles': E.autoRoles(g); save(); render(); toast(T().saved); break;
+      case 'newGame': if (confirm(T().newGameQ)) { g = E.newGame((Date.now() ^ (Math.random() * 1e9)) >>> 0); tab = 0; save(); closeModal(); render(); } break;
+      case 'closeModal': closeModal(); break;
+      case 'closeBg': if (ev.target === el) closeModal(); break;
+    }
+  });
+  document.addEventListener('change', (ev) => {
+    const d = ev.target.dataset;
+    if (d.btype !== undefined) { g.plan.battles[+d.btype].type = ev.target.value; save(); render(); }
+    else if (d.retreat !== undefined) { g.plan.retreat = ev.target.value; save(); }
+    else if (d.role) { const p = personById(+d.role); p.role = ev.target.value; save(); render(); }
+    else if (d.focus) { const p = personById(+d.focus); p.focus = +ev.target.value; save(); }
+  });
+  document.getElementById('langBtn').addEventListener('click', () => { lang = lang === 'en' ? 'ja' : 'en'; store.set(LANG_KEY, lang); render(); });
+  document.getElementById('menuBtn').addEventListener('click', openSettings);
+
+  applyTheme();
+  render();
+  save();
+
+  if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+    window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js').catch(() => { /* offline support is optional */ }); });
+  }
+})();
+</script>
+</body>
+</html>
