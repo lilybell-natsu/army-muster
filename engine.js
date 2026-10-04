@@ -4,7 +4,7 @@
 (function (root) {
   'use strict';
 
-  const VERSION = '0.3.0';
+  const VERSION = '0.4.0';
 
   // ---------- definitions ----------
   // 9 stats: 3 categories × 3. Each merges two of the former 18 (spec §23):
@@ -66,6 +66,10 @@
     randomBattlesPerYear: [1, 2, 2, 3],
     // battle experience per main stat. 0.5 with 9 stats keeps the army-wide growth of the former +1.0 over 18 stats (spec §23)
     levyExtra: 2, battleExp: 0.5,
+    // levy rank: stat mean minus the army average ≥ 0 / 7 / 15 → Promising / Gifted / Prodigy (below 0 → Common)
+    levyRankDiff: [0, 7, 15],
+    // changing a soldier's role costs this many turns of retraining (no battle, no growth)
+    roleChangeTurns: 2,
     tierRatio: [1.8, 1.4, 1.1, 0.9, 0.65],
     ownRate: [[0.002, 0.006], [0.005, 0.012], [0.010, 0.020], [0.025, 0.040], [0.040, 0.070], [0.080, 0.130]],
     enemyRate: [0.60, 0.45, 0.30, 0.15, 0.08, 0.04],
@@ -177,7 +181,10 @@
     if (!mates.some((q) => q.role === 'commander')) p.role = 'commander';
     else p.role = reqMean(p, 'archer') > reqMean(p, 'infantry') + 3 ? 'archer' : 'infantry';
     if (p.focus < 0) p.focus = ROLE_REQ[p.role][0];
+    p.roleAtPlan = p.role;   // joining with a role is free; only later changes cost turns
   }
+  // soldiers who are not retraining for a new role this turn
+  const ready = (g) => soldiers(g).filter((p) => !(p.retrain > 0));
 
   // automatic role assignment (players can override per person)
   function autoRoles(g) {
@@ -230,7 +237,7 @@
   }
 
   const freshYear = () => ({ battles: 0, wins: 0, losses: 0, deaths: 0, levied: 0, levyWanted: 0, refilled: 0, recruits: 0, scouted: 0,
-    leaps: 0, grads: [], res: [0, 0, 0, 0, 0, 0, 0], scoutRanks: [0, 0, 0, 0], genRanks: [0, 0, 0, 0] });
+    leaps: 0, grads: [], res: [0, 0, 0, 0, 0, 0, 0], scoutRanks: [0, 0, 0, 0], genRanks: [0, 0, 0, 0], levyRanks: [0, 0, 0, 0] });
 
   function startYear(g) {
     g.ys = freshYear();
@@ -333,14 +340,19 @@
       });
     }
     if (!g.plan) g.plan = { battles: [{ opp: 'equal', type: 'Clash' }], policy: 'auto', retreat: 'defeat' };
+    // roles at the start of planning: a different role when the month runs costs retraining turns (changing back is free)
+    soldiers(g).forEach((p) => { p.roleAtPlan = p.role; });
   }
+  // soldiers whose role differs from the start of planning (they will retrain when the month runs)
+  const roleChanges = (g) => soldiers(g).filter((p) => p.roleAtPlan && p.role !== p.roleAtPlan);
 
   const plainMean = (list, type) => mean(list.map((p) => mean(BATTLE_MAIN[type].map((j) => p.stats[j]))));
   const powerOf = (p, type) => ROLE_AFF[type][p.role] * (0.5 * mean(BATTLE_MAIN[type].map((j) => p.stats[j])) + 0.5 * reqMean(p, p.role));
 
   function participants(g, type) {
-    const all = soldiers(g);
-    const by = squadsOf(g); const sq = Object.keys(by);
+    const all = ready(g).length ? ready(g) : soldiers(g);   // retraining soldiers stay out of battle
+    const by = {}; all.forEach((p) => { (by[p.squad] = by[p.squad] || []).push(p); });
+    const sq = Object.keys(by);
     if (type === 'Clash') return all;
     if (type === 'Skirmish') return by[pick(g, sq)];
     let parts = [];
@@ -377,7 +389,7 @@
   function growTurn(g) {
     const dev = 1 + 0.1 * g.ind.dev / 100;
     const inst = 1 + Math.min(0.15, 0.03 * withJob(g, 'instructor').length);
-    soldiers(g).forEach((p) => {
+    ready(g).forEach((p) => {   // no growth while retraining for a new role
       for (let j = 0; j < STATS.length; j++) {
         const range = j === p.focus ? CFG.growth.focus : CFG.growth.other;
         const annual = U(g, range[0], range[1]);
@@ -463,9 +475,15 @@
       const yearLeft = Math.max(0, Math.round(CFG.recruitByClass[g.cls - 1] * CFG.levyYearCapMult) - g.ys.levied);
       const levy = Math.min(want, Math.max(0, capacity(g) - soldiers(g).length), yearLeft);
       g.ys.levyWanted += want;
+      // levied soldiers get a rank from their stats compared with the army average (spec §5.7)
+      const armyMean = mean(soldiers(g).map((p) => mean(p.stats)));
       for (let i = 0; i < levy; i++) {
         const st = []; for (let j = 0; j < STATS.length; j++) st.push(clamp(eMean * 0.9 + U(g, -8, 8), 1, 200));
         const p = newPerson(g, { spec: Math.floor(rnd(g) * 3), stats: st, origin: 'levy' });
+        const diff = mean(p.stats) - armyMean; const th = CFG.levyRankDiff;
+        p.rank = diff >= th[2] ? 3 : diff >= th[1] ? 2 : diff >= th[0] ? 1 : 0;
+        p.talent = p.talent.map((x) => x * RANK_TAL[p.rank]);
+        g.ys.levyRanks[p.rank]++;
         assignSquad(g, p);
       }
       g.ys.levied += levy; out.levied = levy; out.levyWanted = want;
@@ -501,6 +519,8 @@
     const nb = Math.min(3, plan.battles.length);
     const sched = SCHEDULE[nb];
     const retreatAt = plan.retreat === 'never' ? 9 : plan.retreat === 'stalemate' ? 3 : 4;
+    // role changes made during planning cost retraining turns (no battle, no growth)
+    rep.retrain = roleChanges(g).map((p) => { p.retrain = CFG.roleChangeTurns; p.roleAtPlan = p.role; return p.name; });
     for (let t = 0; t < 5; t++) {
       let res = null;
       const si = sched.indexOf(t);
@@ -513,6 +533,7 @@
       } else rep.govern += governTurn(g, policy);
       if (res) { res.turn = t + 1; rep.battles.push(res); }
       growTurn(g);
+      soldiers(g).forEach((p) => { if (p.retrain > 0) p.retrain--; });
     }
     // month end
     soldiers(g).forEach((p) => { p.tenure++; });
@@ -533,7 +554,7 @@
       const s = soldiers(g);
       g.history.push({ year: year(g), clsBefore: before, clsAfter: g.cls, score, soldiers: s.length, meanAll: mean(s.map((p) => mean(p.stats))),
         battles: ys.battles, wins: ys.wins, losses: ys.losses, deaths: ys.deaths, levied: ys.levied, recruits: ys.recruits, scouted: ys.scouted,
-        leaps: ys.leaps, grads: ys.grads.length, empire: ys.grads.filter((x) => x.path === 'empire').length, scoutRanks: ys.scoutRanks.slice(), genRanks: ys.genRanks.slice() });
+        leaps: ys.leaps, grads: ys.grads.length, empire: ys.grads.filter((x) => x.path === 'empire').length, scoutRanks: ys.scoutRanks.slice(), genRanks: ys.genRanks.slice(), levyRanks: ys.levyRanks.slice() });
       rep.cls = { before, after: g.cls, score };
     }
     g.reports.unshift(rep);
@@ -563,13 +584,16 @@
     const romanized = (n) => typeof n === 'string' && /^[A-Za-z]/.test(n);
     g.people.forEach((p) => { fix(p); if (romanized(p.name)) p.name = genName(g); });
     if (g.scout) g.scout.districts.forEach((d) => d.cands.forEach((c) => { fix(c.gen); if (romanized(c.name)) c.name = genName(g); }));
+    // v0.4: yearly levy-rank counter and role bookkeeping
+    if (g.ys && !g.ys.levyRanks) g.ys.levyRanks = [0, 0, 0, 0];
+    g.people.forEach((p) => { if (p.alive && !p.job && p.roleAtPlan === undefined) p.roleAtPlan = p.role; });
     g.v = VERSION;
     return g;
   }
 
   root.GameEngine = {
     VERSION, CFG, STATS, IDX, CATS, GOVERN, BATTLE_TYPES, ROLES, ROLE_REQ, BATTLE_MAIN, TIERS, PATHS, RECRUIT,
-    PER_CAT, MERGE, readingOf, migrate,
+    PER_CAT, MERGE, readingOf, migrate, roleChanges,
     newGame, runMonth, scoutPick, scoutFinish, scoutP, recruiter, recruitScore, estimate, tierOf,
     autoRoles, autoFocus, soldiers, withJob, squadsOf, capacity, reqMean, year, cal, mean, catOf, rankProbs,
   };

@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.4.0 — 2026-10-05
+- Army tab: every soldier now shows all 9 current stats (category colours, training focus underlined); retained graduates too
+- Changing a soldier's role costs 2 turns of retraining when the month runs (no battle, no growth). Switching back before running is free; a notice shows pending changes
+- Levied soldiers now get a rank from their stats compared with the army average (≥0 / ≥7 / ≥15 → Promising / Gifted / Prodigy), which scales their talent
+- Monthly reports list soldiers who started retraining
+
 ## v0.3.0 — 2026-10-05
 - Stats merged from 18 to 9 (3 per category): POW / DEX / MOB, INT / TAC / VIS, CMD / ELO / POL. Battles, roles, governing, scouting, retreat and graduation now use the merged stats
 - Battle experience per main stat lowered 1.0 → 0.5 to keep overall growth at the former level

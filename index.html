@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="app-version" content="0.3.0">
+<meta name="app-version" content="0.4.0">
 <meta name="theme-color" content="#1f2a37">
 <title>Army Muster</title>
 <link rel="manifest" href="manifest.json">
@@ -67,6 +67,17 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 .tablewrap table { min-width: 460px; }
 th { white-space: nowrap; }
 .person { cursor: pointer; text-decoration: underline dotted; }
+.pp { border-top: 1px solid var(--line); padding: 8px 0; }
+.pp:first-of-type { border-top: 0; }
+.phead { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.phead .person { font-weight: 700; }
+.pmeta { margin-left: auto; }
+.pctl { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 6px 0; }
+.pstats { display: grid; grid-template-columns: repeat(9, minmax(0, 1fr)); gap: 3px; }
+.pstats div { display: flex; flex-direction: column; align-items: center; background: var(--muted); border-radius: 6px; padding: 2px 0; min-width: 0; }
+.pstats span { font-size: 10px; color: var(--sub); white-space: nowrap; }
+.pstats b { font-size: 14px; font-variant-numeric: tabular-nums; }
+.pstats .foc { box-shadow: inset 0 -2px 0 currentColor; }
 .leap { color: var(--accent); font-weight: 700; }
 .cands { display: grid; gap: 6px; }
 .cand { display: flex; align-items: center; gap: 8px; border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; }
@@ -151,6 +162,8 @@ th { white-space: nowrap; }
       initial: 'At enlistment', now: 'Now', months2: 'months', talent: 'Talent', tenure: 'Service', origin2: 'Origin', spec: 'Specialty', theme: 'Theme', themes: { auto: 'Auto', light: 'Light', dark: 'Dark' },
       saved: 'Saved', storageOff: 'Storage is unavailable — progress will not be saved.', yearEnd: 'Year end', recordCols: ['Yr', 'Class', 'Troops', 'Avg', 'Battles', 'W', 'L', 'Lost', 'Levied', 'Grads', 'Empire', 'Score'],
       squadAvg: 'Squad average', pickHint: 'Tap a name for details',
+      retraining: 'Retraining: {n} turns left', retrainPlan: 'Role change: {n} turns', retrainRep: 'Retraining for a new role',
+      roleCostNote: '{n} role change(s) pending. Each takes {t} turns of retraining when the month runs (no battle, no growth). Switching back before running is free.',
     },
     ja: {
       tabs: ['計画', '軍', '領地', '報告'], year: '年', cls: 'クラス', troops: '兵力',
@@ -177,6 +190,8 @@ th { white-space: nowrap; }
       initial: '入隊時', now: '現在', months2: 'か月', talent: '素質', tenure: '在籍', origin2: '入り方', spec: '得意', theme: '表示', themes: { auto: '自動', light: 'ライト', dark: 'ダーク' },
       saved: '保存しました', storageOff: '保存できない環境です(進行は保存されません)', yearEnd: '年末', recordCols: ['年', 'クラス', '在籍', '平均', '戦', '勝', '敗', '損失', '挙兵', '卒兵', '帝国', '評価点'],
       squadAvg: '小隊の平均', pickHint: '名前をタップで詳細',
+      retraining: '兵科転換中 残り{n}ターン', retrainPlan: '兵科を変更(実行時に{n}ターン)', retrainRep: '兵科転換',
+      roleCostNote: '兵科の変更が{n}件あります。今月を実行すると、変更した人は{t}ターンを転換にあてます(その間は戦に出ず、成長もしません)。実行前に元へ戻せば代償はありません。',
     },
   };
   let lang = store.get(LANG_KEY) === 'en' ? 'en' : 'ja';   // Japanese by default; EN via the toggle
@@ -305,26 +320,37 @@ th { white-space: nowrap; }
     return h;
   }
 
+  // all 9 current stats of one person, coloured by category; the training focus is underlined
+  function statRow(p) {
+    return '<div class="pstats">' + E.STATS.map((s, j) => '<div class="c' + E.catOf(j) + (p.focus === j ? ' foc' : '') + '" title="' + esc(statTitle(s)) + '"><span>' + statLabel(s) + '</span><b>' + f0(p.stats[j]) + '</b></div>').join('') + '</div>';
+  }
+
   // ---------- Army tab ----------
   function renderArmy() {
     const t = T(); const by = E.squadsOf(g);
     let h = '<div class="row" style="margin-bottom:10px"><button class="btn" data-act="autoRoles">' + t.autoRoles + '</button><button class="btn" data-act="autoFocus">' + t.autoFocus + '</button><span class="small">' + t.pickHint + '</span></div>';
+    const pending = E.roleChanges(g).length;
+    if (pending) h += '<div class="card small" style="color:var(--mid)">' + t.roleCostNote.replace('{n}', pending).replace('{t}', E.CFG.roleChangeTurns) + '</div>';
     Object.keys(by).map(Number).sort((a, b) => a - b).forEach((sq) => {
       const list = by[sq];
       const avg = E.STATS.map((_, j) => E.mean(list.map((p) => p.stats[j])));
-      h += '<div class="card"><h2>' + t.squad + ' ' + sq + '<span class="hint">' + t.avg + ' ' + f0(E.mean(avg)) + '</span></h2><div class="tablewrap"><table><tr><th>' + t.name + '</th><th>' + t.role + '</th><th>' + t.rank + '</th><th class="num">' + t.avg + '</th><th>' + t.focus + '</th><th class="num">' + t.left + '</th></tr>';
+      h += '<div class="card"><h2>' + t.squad + ' ' + sq + '<span class="hint">' + t.avg + ' ' + f0(E.mean(avg)) + '</span></h2>';
       list.slice().sort((a, b) => E.ROLES.indexOf(a.role) - E.ROLES.indexOf(b.role)).forEach((p) => {
-        h += '<tr><td><span class="person" data-person="' + p.id + '">' + esc(p.name) + '</span> ' + '<span class="chip c' + p.spec + '" title="' + t.spec + '">' + t.cats[p.spec].slice(0, lang === 'ja' ? 2 : 3) + '</span>' + (p.leap ? ' <span class="leap" title="LEAP">↑</span>' : '') + '</td>';
-        h += '<td><select data-role="' + p.id + '">' + E.ROLES.map((r) => '<option value="' + r + '"' + (p.role === r ? ' selected' : '') + '>' + t.roles[r] + '</option>').join('') + '</select></td>';
-        h += '<td>' + rankChip(p.rank) + '</td><td class="num">' + f0(E.mean(p.stats)) + '</td>';
-        h += '<td><select data-focus="' + p.id + '">' + E.STATS.map((s, j) => '<option value="' + j + '"' + (p.focus === j ? ' selected' : '') + '>' + statLabel(s) + (E.ROLE_REQ[p.role].includes(j) ? ' *' : '') + '</option>').join('') + '</select></td>';
-        h += '<td class="num">' + (60 - p.tenure) + '</td></tr>';
+        // status: retraining now, or a role change that will start retraining when the month runs
+        const status = p.retrain > 0 ? '<span class="chip t3">' + t.retraining.replace('{n}', p.retrain) + '</span>'
+          : (p.roleAtPlan && p.role !== p.roleAtPlan) ? '<span class="chip t3">' + t.retrainPlan.replace('{n}', E.CFG.roleChangeTurns) + '</span>' : '';
+        h += '<div class="pp"><div class="phead"><span class="person" data-person="' + p.id + '">' + esc(p.name) + '</span>' +
+          '<span class="chip c' + p.spec + '" title="' + t.spec + '">' + t.cats[p.spec] + '</span>' + rankChip(p.rank) + (p.leap ? '<span class="leap" title="LEAP">↑</span>' : '') + status +
+          '<span class="small pmeta">' + t.avg + ' ' + f0(E.mean(p.stats)) + ' · ' + t.left + ' ' + (60 - p.tenure) + '</span></div>';
+        h += '<div class="pctl"><select data-role="' + p.id + '" title="' + t.role + '">' + E.ROLES.map((r) => '<option value="' + r + '"' + (p.role === r ? ' selected' : '') + '>' + t.roles[r] + '</option>').join('') + '</select>' +
+          '<span class="small">' + t.focus + '</span><select data-focus="' + p.id + '">' + E.STATS.map((s, j) => '<option value="' + j + '"' + (p.focus === j ? ' selected' : '') + '>' + statLabel(s) + (E.ROLE_REQ[p.role].includes(j) ? ' *' : '') + '</option>').join('') + '</select></div>';
+        h += statRow(p) + '</div>';
       });
-      h += '</table></div></div>';
+      h += '</div>';
     });
     const jobs = g.people.filter((p) => p.alive && p.job);
     if (jobs.length) {
-      h += '<div class="card"><h2>' + t.jobs + '</h2><table>' + jobs.map((p) => '<tr><td><span class="person" data-person="' + p.id + '">' + esc(p.name) + '</span></td><td>' + t.paths[p.job] + '</td><td class="num">' + f0(E.mean(p.stats)) + '</td></tr>').join('') + '</table></div>';
+      h += '<div class="card"><h2>' + t.jobs + '</h2>' + jobs.map((p) => '<div class="pp"><div class="phead"><span class="person" data-person="' + p.id + '">' + esc(p.name) + '</span><span class="small">' + t.paths[p.job] + '</span><span class="small pmeta">' + t.avg + ' ' + f0(E.mean(p.stats)) + '</span></div>' + statRow(p) + '</div>').join('') + '</div>';
     }
     return h;
   }
@@ -369,6 +395,7 @@ th { white-space: nowrap; }
             (b.refilled ? ' · ' + t.refill + ' +' + b.refilled : '') + (b.mvp ? ' · ' + t.mvp + ': ' + esc(b.mvp) : '') + '</li>';
         });
         if (r.govern > 0) h += '<li>' + t.governed + ': ' + t.gov[r.policy] + ' +' + r.govern.toFixed(1) + '</li>';
+        if (r.retrain && r.retrain.length) h += '<li>' + t.retrainRep + ': ' + r.retrain.map(esc).join(', ') + '</li>';
         if (r.leaps.length) h += '<li class="leap">LEAP: ' + r.leaps.map(esc).join(', ') + '</li>';
         r.grads.forEach((x) => { h += '<li>' + t.gradL + ': ' + esc(x.name) + ' → ' + t.paths[x.path] + ' (' + t.avg + ' ' + f0(x.mean) + ')</li>'; });
         if (r.cls) h += '<li><b>' + t.yearEnd + '</b>: ' + t.score + ' ' + (r.cls.score === null ? '-' : r.cls.score.toFixed(1)) + ' · ' + t.clsChange + ' ' + r.cls.before + (r.cls.after !== r.cls.before ? ' → <b>' + r.cls.after + '</b>' : '') + '</li>';
