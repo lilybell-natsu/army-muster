@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="app-version" content="0.2.0">
+<meta name="app-version" content="0.3.0">
 <meta name="theme-color" content="#1f2a37">
 <title>Army Muster</title>
 <link rel="manifest" href="manifest.json">
@@ -106,6 +106,7 @@ th { white-space: nowrap; }
 <main id="main"></main>
 <nav id="nav"></nav>
 <div id="modal"></div>
+<script src="names.js"></script>
 <script src="engine.js"></script>
 <script>
 (function () {
@@ -119,9 +120,11 @@ th { white-space: nowrap; }
   };
 
   // ---------- labels (English is the default; Japanese via the toggle) ----------
-  const STAT_JA = { VIT: ['体力', '疲れずに動き続ける'], STR: ['腕力', '持てる量・力の強さ'], SPD: ['脚力', '動ける範囲'], DEX: ['技術力', '技術の正確さ'], AGI: ['瞬発力', '体の反応速度'], SEN: ['感覚', '気配を感じ取る'],
-    FOC: ['集中', '頭が持つ・集中が続く'], MEM: ['記憶', '覚えられる量'], VIS: ['俯瞰', '見渡せる範囲'], TAC: ['策略', '作戦の緻密さ'], PRO: ['処理', '頭の回転'], INS: ['発想', '閃きを捉える'],
-    CHA: ['人望', '支持が続く'], CMD: ['掌握', '動かせる人の量'], POL: ['政治', '影響の及ぶ範囲'], MAN: ['籠絡', '操り方の巧さ'], ELO: ['弁舌', '口の回転'], EMP: ['読心', '人の本心を見抜く'] };
+  // 9 stats (spec §23): each merges two of the former 18
+  const STAT_JA = {
+    POW: ['剛力', '疲れずに動き続け、力強く押す(旧:体力+腕力)'], DEX: ['技量', '技の正確さと体の反応(旧:技術力+瞬発力)'], MOB: ['機動', '動ける範囲と、気配を感じ取る力(旧:脚力+感覚)'],
+    INT: ['知力', '集中が続き、多くを覚える(旧:集中+記憶)'], TAC: ['策略', '作戦の緻密さと頭の回転(旧:策略+処理)'], VIS: ['洞察', '戦場を見渡す視野と閃き(旧:俯瞰+発想)'],
+    CMD: ['統率', '人望を集め、多くの人を動かす(旧:人望+掌握)'], ELO: ['話術', '人を操る巧さと口の回転(旧:籠絡+弁舌)'], POL: ['政略', '影響を広げ、人の本心を見抜く(旧:政治+読心)'] };
   const L = {
     en: {
       tabs: ['Plan', 'Army', 'Domain', 'Reports'], year: 'Year', cls: 'Class', troops: 'Troops',
@@ -187,7 +190,7 @@ th { white-space: nowrap; }
   let g = null, tab = 0;
   function load() {
     const raw = store.get(SAVE_KEY);
-    if (raw) { try { const s = JSON.parse(raw); if (s && s.people) return s; } catch (e) { /* broken save — start over */ } }
+    if (raw) { try { const s = JSON.parse(raw); if (s && s.people) return E.migrate(s); } catch (e) { /* broken save — start over */ } }
     return null;
   }
   function save() { if (!store.set(SAVE_KEY, JSON.stringify(g))) toast(T().storageOff); }
@@ -378,20 +381,21 @@ th { white-space: nowrap; }
   function openPerson(id) {
     const p = personById(id); if (!p) return;
     const t = T();
-    let h = '<div class="sheet"><h2>' + esc(p.name) + ' ' + rankChip(p.rank) + ' ' + catChip(p.spec) + '</h2><div class="small">' +
+    const yomi = E.readingOf(p.name);
+    let h = '<div class="sheet"><h2>' + esc(p.name) + (yomi ? ' <span class="small">(' + esc(yomi) + ')</span>' : '') + ' ' + rankChip(p.rank) + ' ' + catChip(p.spec) + '</h2><div class="small">' +
       (p.job ? t.paths[p.job] : p.role ? t.roles[p.role] + ' · ' + t.squad + ' ' + p.squad : (p.fate ? t.paths[p.fate] || p.fate : '')) + ' · ' + t.origin2 + ': ' + t.origin[p.origin] + ' · ' + t.tenure + ' ' + p.tenure + ' ' + t.months2 + ' · ' + t.avg + ' ' + f0(E.mean(p.stats)) + '</div>';
-    // one 6-axis radar per category (PHYSICAL / MENTAL / SOCIAL), axis max fixed at 200
+    // one 3-axis radar per category (PHYSICAL / MENTAL / SOCIAL), axis max fixed at 200
     h += '<div class="radars">';
     for (let c = 0; c < 3; c++) {
-      const js = [0, 1, 2, 3, 4, 5].map((k) => c * 6 + k);
+      const js = [0, 1, 2].map((k) => c * E.PER_CAT + k);
       h += '<div class="radarbox"><div class="rtitle c' + c + '">' + t.cats[c] + ' <span class="small">' + t.avg + ' ' + f0(E.mean(js.map((j) => p.stats[j]))) + '</span></div>' +
         radar(js.map((j) => statLabel(E.STATS[j])), [{ v: js.map((j) => p.init[j]), color: 'var(--sub)', dash: true }, { v: js.map((j) => p.stats[j]), color: CAT_VARS[c], fill: CAT_FILLS[c] }], 200, 200) + '</div>';
     }
     h += '</div>';
     h += '<div class="small" style="text-align:center;margin-bottom:8px">- - ' + t.initial + ' / — ' + t.now + '</div>';
     h += '<div class="statgrid">';
-    for (let k = 0; k < 6; k++) for (let c = 0; c < 3; c++) {
-      const j = c * 6 + k; const s = E.STATS[j];
+    for (let k = 0; k < E.PER_CAT; k++) for (let c = 0; c < 3; c++) {
+      const j = c * E.PER_CAT + k; const s = E.STATS[j];
       h += '<div class="c' + c + '"><span title="' + esc(statTitle(s)) + '">' + statLabel(s) + (p.focus === j ? ' ●' : '') + '</span><b>' + f0(p.stats[j]) + '</b></div>';
     }
     h += '</div><div style="margin-top:14px;text-align:right"><button class="btn" data-act="closeModal">' + t.close + '</button></div></div>';

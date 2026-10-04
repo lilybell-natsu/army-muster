@@ -4,26 +4,32 @@
 (function (root) {
   'use strict';
 
-  const VERSION = '0.2.0';
+  const VERSION = '0.3.0';
 
   // ---------- definitions ----------
-  const STATS = ['VIT','STR','SPD','DEX','AGI','SEN', 'FOC','MEM','VIS','TAC','PRO','INS', 'CHA','CMD','POL','MAN','ELO','EMP'];
+  // 9 stats: 3 categories × 3. Each merges two of the former 18 (spec §23):
+  //  (endurance+capacity) / (precision+reaction) / (range+perception)
+  const STATS = ['POW','DEX','MOB', 'INT','TAC','VIS', 'CMD','ELO','POL'];
+  const PER_CAT = 3;
   const IDX = {}; STATS.forEach((s, i) => { IDX[s] = i; });
-  const catOf = (i) => Math.floor(i / 6);
+  const catOf = (i) => Math.floor(i / PER_CAT);
   const ids = (a) => a.map((s) => IDX[s]);
   const CATS = ['PHYSICAL', 'MENTAL', 'SOCIAL'];
+  // former 18-stat order → the new stat each one merged into (used to migrate v0.1–0.2 saves)
+  const OLD18 = ['VIT','STR','SPD','DEX','AGI','SEN', 'FOC','MEM','VIS','TAC','PRO','INS', 'CHA','CMD','POL','MAN','ELO','EMP'];
+  const MERGE = { POW: ['VIT','STR'], DEX: ['DEX','AGI'], MOB: ['SPD','SEN'], INT: ['FOC','MEM'], TAC: ['TAC','PRO'], VIS: ['VIS','INS'], CMD: ['CHA','CMD'], ELO: ['MAN','ELO'], POL: ['POL','EMP'] };
 
-  const BATTLE_MAIN = { Skirmish: ids(['AGI','SEN','DEX']), Clash: ids(['CMD','TAC','VIS']), Ambush: ids(['SEN','INS','SPD']) };
+  const BATTLE_MAIN = { Skirmish: ids(['DEX','MOB','POW']), Clash: ids(['CMD','TAC','VIS']), Ambush: ids(['MOB','VIS','TAC']) };
   const BATTLE_TYPES = ['Skirmish', 'Clash', 'Ambush'];   // Duel is not implemented yet
   const GOVERN = [
-    { name: 'Develop',    key: 'dev', main: ids(['POL','VIS','PRO']) },
-    { name: 'Discipline', key: 'dis', main: ids(['CMD','VIT','CHA']) },
-    { name: 'Pacify',     key: 'pac', main: ids(['CHA','EMP','ELO']) },
-    { name: 'Negotiate',  key: 'dip', main: ids(['ELO','MAN','EMP']) },
+    { name: 'Develop',    key: 'dev', main: ids(['POL','VIS','TAC']) },
+    { name: 'Discipline', key: 'dis', main: ids(['CMD','POW']) },
+    { name: 'Pacify',     key: 'pac', main: ids(['CMD','POL','ELO']) },
+    { name: 'Negotiate',  key: 'dip', main: ids(['ELO','POL']) },
   ];
   const SCHEDULE = { 0: [], 1: [2], 2: [1, 3], 3: [0, 2, 4] };   // which turn(s) of the month hold a planned battle
   const ROLES = ['commander', 'infantry', 'archer'];
-  const ROLE_REQ = { commander: ids(['CMD','TAC','CHA']), infantry: ids(['VIT','STR','AGI']), archer: ids(['DEX','SEN','VIS']) };
+  const ROLE_REQ = { commander: ids(['CMD','TAC']), infantry: ids(['POW','DEX']), archer: ids(['DEX','MOB','VIS']) };
   const ROLE_AFF = {
     Skirmish: { commander: 0.8, infantry: 1.10, archer: 1.00 },
     Clash:    { commander: 0.9, infantry: 1.05, archer: 1.00 },
@@ -31,8 +37,10 @@
   };
   const RANK_OFF = [0, 6, 12, 20];
   const RANK_TAL = [1.0, 1.1, 1.2, 1.35];
-  const RET7 = ids(['VIS','TAC','INS','SEN','CMD','ELO','EMP']);
-  const RECRUIT = ids(['CHA','MAN','EMP']);
+  // retreat judgement (former VIS/TAC/INS/SEN/CMD/ELO/EMP)
+  const RET7 = ids(['VIS','TAC','MOB','CMD','ELO','POL']);
+  // scouting success (Recruit: former CHA/MAN/EMP)
+  const RECRUIT = ids(['CMD','ELO','POL']);
   const TIERS = ['totalVictory', 'majorVictory', 'victory', 'stalemate', 'defeat', 'rout', 'retreat'];
   const PATHS = ['empire', 'instructor', 'bureau', 'general', 'retire'];
 
@@ -56,7 +64,8 @@
     oppExp: { weak: 0.5, equal: 1.0, strong: 1.6, big: 2.2, sudden: 2.5, random: 1.0 },
     archerRatio: 0.4,
     randomBattlesPerYear: [1, 2, 2, 3],
-    levyExtra: 2, battleExp: 1.0,
+    // battle experience per main stat. 0.5 with 9 stats keeps the army-wide growth of the former +1.0 over 18 stats (spec §23)
+    levyExtra: 2, battleExp: 0.5,
     tierRatio: [1.8, 1.4, 1.1, 0.9, 0.65],
     ownRate: [[0.002, 0.006], [0.005, 0.012], [0.010, 0.020], [0.025, 0.040], [0.040, 0.070], [0.080, 0.130]],
     enemyRate: [0.60, 0.45, 0.30, 0.15, 0.08, 0.04],
@@ -85,9 +94,15 @@
   const U = (g, a, b) => a + (b - a) * rnd(g);
   const pick = (g, arr) => arr[Math.floor(rnd(g) * arr.length)];
 
-  const SYL_A = ['Al','Ber','Cal','Dor','El','Fen','Gar','Hal','Ior','Jor','Kel','Lor','Mar','Nor','Or','Per','Quin','Ros','Sel','Tor','Ul','Val','Wen','Yor','Zan','Ar','Bel','Cyr','Dun','Eld'];
-  const SYL_B = ['an','ric','en','wyn','o','as','ius','ard','eth','in','ia','or','us','ell','ac','ion','a','is','ent','ald'];
-  const genName = (g) => pick(g, SYL_A) + pick(g, SYL_B);
+  // Japanese surnames (names.js). Avoid names already used by living members when possible.
+  const NAMES = root.NAME_LIST && root.NAME_LIST.length ? root.NAME_LIST : [['兵', 'へい']];
+  function genName(g) {
+    const used = new Set(g.people.filter((p) => p.alive).map((p) => p.name));
+    let n = pick(g, NAMES);
+    for (let k = 0; k < 12 && used.has(n[0]); k++) n = pick(g, NAMES);
+    return n[0];
+  }
+  const readingOf = (name) => { const n = NAMES.find((x) => x[0] === name); return n ? n[1] : ''; };
 
   function rankProbs(cls) {
     const t = cls - 1;
@@ -95,7 +110,8 @@
     return [1 - p2 - p3 - p4, p2, p3, p4];
   }
 
-  // a recruit's base numbers: rank, specialty category (+15), two favoured stats (+10), one weak stat (−8), talent
+  // a recruit's base numbers: rank, specialty category (+15), one favoured stat (+10), one weak stat (−8), talent
+  // (with 9 stats, one favoured stat keeps the same share as the former two-of-18)
   function genRecruit(g, cls, probs, specFix) {
     const t = cls - 1;
     const [, p2, p3, p4] = probs || rankProbs(cls);
@@ -103,10 +119,11 @@
     const rank = x < p4 ? 3 : x < p4 + p3 ? 2 : x < p4 + p3 + p2 ? 1 : 0;
     const sr = Math.floor(rnd(g) * 3);
     const spec = specFix === undefined ? sr : specFix;
-    const fav = []; while (fav.length < 2) { const k = Math.floor(rnd(g) * 18); if (!fav.includes(k)) fav.push(k); }
-    let weak; do { weak = Math.floor(rnd(g) * 18); } while (fav.includes(weak));
+    const N = STATS.length;
+    const fav = [Math.floor(rnd(g) * N)];
+    let weak; do { weak = Math.floor(rnd(g) * N); } while (fav.includes(weak));
     const stats = [], talent = [];
-    for (let j = 0; j < 18; j++) {
+    for (let j = 0; j < N; j++) {
       const v = CFG.base + t * CFG.recruitClassBonus + U(g, -5, 5) + (catOf(j) === spec ? CFG.specBonus : 0) + RANK_OFF[rank] + (fav.includes(j) ? 10 : 0) - (j === weak ? 8 : 0);
       stats.push(clamp(v, 1, 200));
       talent.push((U(g, 0.8, 1.2) + (catOf(j) === spec ? 0.1 : 0)) * RANK_TAL[rank]);
@@ -129,7 +146,7 @@
     };
     const gen = o.gen || (o.recruit ? genRecruit(g, g.cls) : null);
     if (gen) { p.spec = gen.spec; p.rank = gen.rank; p.stats = gen.stats.slice(); p.talent = gen.talent.slice(); p.fav = gen.fav; p.weak = gen.weak; }
-    for (let j = 0; !gen && j < 18; j++) {
+    for (let j = 0; !gen && j < STATS.length; j++) {
       const v = o.stats ? o.stats[j]
         : CFG.base + (o.baseAdd || 0) + U(g, -5, 5) + (catOf(j) === o.spec ? CFG.specBonus : 0)
           + (o.leader ? CFG.leaderBonus + ((j === IDX.CMD || j === IDX.TAC) ? CFG.leaderCT : 0) : 0)
@@ -361,7 +378,7 @@
     const dev = 1 + 0.1 * g.ind.dev / 100;
     const inst = 1 + Math.min(0.15, 0.03 * withJob(g, 'instructor').length);
     soldiers(g).forEach((p) => {
-      for (let j = 0; j < 18; j++) {
+      for (let j = 0; j < STATS.length; j++) {
         const range = j === p.focus ? CFG.growth.focus : CFG.growth.other;
         const annual = U(g, range[0], range[1]);
         const s = p.stats[j];
@@ -447,7 +464,7 @@
       const levy = Math.min(want, Math.max(0, capacity(g) - soldiers(g).length), yearLeft);
       g.ys.levyWanted += want;
       for (let i = 0; i < levy; i++) {
-        const st = []; for (let j = 0; j < 18; j++) st.push(clamp(eMean * 0.9 + U(g, -8, 8), 1, 200));
+        const st = []; for (let j = 0; j < STATS.length; j++) st.push(clamp(eMean * 0.9 + U(g, -8, 8), 1, 200));
         const p = newPerson(g, { spec: Math.floor(rnd(g) * 3), stats: st, origin: 'levy' });
         assignSquad(g, p);
       }
@@ -458,8 +475,8 @@
 
   function graduate(g, p) {
     const m = mean(p.stats);
-    const instr = (p.stats[IDX.CMD] + p.stats[IDX.CHA] + p.stats[IDX.MEM]) / 3;
-    const bur = (p.stats[IDX.POL] + p.stats[IDX.PRO] + p.stats[IDX.VIS]) / 3;
+    const instr = (p.stats[IDX.CMD] + p.stats[IDX.INT]) / 2;
+    const bur = (p.stats[IDX.POL] + p.stats[IDX.TAC] + p.stats[IDX.VIS]) / 3;
     const gen = (p.stats[IDX.CMD] + p.stats[IDX.TAC] + p.stats[IDX.VIS]) / 3;
     let path = 'retire';
     if (m >= CFG.empireMean) path = 'empire';
@@ -529,8 +546,30 @@
     return rep;
   }
 
+  // upgrade saves from v0.1–0.2 (18 stats, romanized names) to the 9-stat model with Japanese surnames
+  function migrate(g) {
+    if (!g || !g.people) return g;
+    const pos = (s) => OLD18.indexOf(s);
+    const merge = (a) => STATS.map((s) => (a[pos(MERGE[s][0])] + a[pos(MERGE[s][1])]) / 2);
+    const newIdx = (i) => STATS.findIndex((s) => MERGE[s].includes(OLD18[i]));
+    const fix = (o) => {
+      if (!o || !o.stats || o.stats.length !== OLD18.length) return;
+      o.stats = merge(o.stats); o.talent = merge(o.talent);
+      if (o.init) o.init = merge(o.init);
+      if (o.fav) o.fav = [newIdx(o.fav[0])];
+      if (o.weak !== undefined) o.weak = newIdx(o.weak);
+      if (o.focus !== undefined && o.focus >= 0) o.focus = newIdx(o.focus);
+    };
+    const romanized = (n) => typeof n === 'string' && /^[A-Za-z]/.test(n);
+    g.people.forEach((p) => { fix(p); if (romanized(p.name)) p.name = genName(g); });
+    if (g.scout) g.scout.districts.forEach((d) => d.cands.forEach((c) => { fix(c.gen); if (romanized(c.name)) c.name = genName(g); }));
+    g.v = VERSION;
+    return g;
+  }
+
   root.GameEngine = {
     VERSION, CFG, STATS, IDX, CATS, GOVERN, BATTLE_TYPES, ROLES, ROLE_REQ, BATTLE_MAIN, TIERS, PATHS, RECRUIT,
+    PER_CAT, MERGE, readingOf, migrate,
     newGame, runMonth, scoutPick, scoutFinish, scoutP, recruiter, recruitScore, estimate, tierOf,
     autoRoles, autoFocus, soldiers, withJob, squadsOf, capacity, reqMean, year, cal, mean, catOf, rankProbs,
   };

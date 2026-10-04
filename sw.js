@@ -1,7 +1,7 @@
 // Service worker: network-first, falling back to the cache when offline.
 // Bump CACHE_NAME whenever the cached file list changes.
-const CACHE_NAME = 'army-muster-v2';
-const ASSETS = ['./', './index.html', './engine.js', './manifest.json', './icons/icon-192.png', './icons/icon-512.png'];
+const CACHE_NAME = 'army-muster-v3';
+const ASSETS = ['./', './index.html', './names.js', './engine.js', './manifest.json', './icons/icon-192.png', './icons/icon-512.png'];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE_NAME).then((c) => c.addAll(ASSETS)).then(() => self.skipWaiting()));

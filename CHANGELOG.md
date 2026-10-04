@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.3.0 — 2026-10-05
+- Stats merged from 18 to 9 (3 per category): POW / DEX / MOB, INT / TAC / VIS, CMD / ELO / POL. Battles, roles, governing, scouting, retreat and graduation now use the merged stats
+- Battle experience per main stat lowered 1.0 → 0.5 to keep overall growth at the former level
+- Person sheet: three 3-axis radar charts and a 3×3 stat table
+- Characters now have Japanese surnames (from 名字見聞録), with the reading shown in the person sheet
+- Older saves are converted automatically (each new stat = average of the two it merges; names are replaced)
+
 ## v0.2.0 — 2026-10-02
 - Japanese is now the default display language (English via the EN/JA toggle)
 - Person sheet: the stat radar is split into three 6-axis charts, one per category (PHYSICAL / MENTAL / SOCIAL), each with its average
